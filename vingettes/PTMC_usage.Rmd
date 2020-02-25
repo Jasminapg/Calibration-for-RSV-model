@@ -1,0 +1,94 @@
+---
+title: "PTMC_usage"
+author: "David Hodgson"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{PTMC_usage}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup}
+library(tidyverse)
+library(ptmc)
+```
+
+## R Markdown
+
+
+```{r}
+model <- list(
+
+  # Initial state of the model (at t0)
+  gen_init = function() {
+    c(rgamma(1, 2, 20), rbeta(1, 2, 40))
+  },
+
+  # Evaluate the
+  eval_lpr = function(params) {
+    if (params[1] < 0 || params[2] < 0 || params[1] > 1 || params[2] > 1)
+      return(-Inf)
+
+    lpr <- 0
+    lpr <- lpr + log(pgamma( params[1], 2,20))
+    lpr <- lpr + log(pbeta( params[2], 2,40))
+    #cat("lpr: " , lpr, "\n")
+    lpr
+  },
+
+  # Required to calculate the logposterior
+  eval_ll = function(data, params) {
+    y <- data$y
+    mu <- params[1]
+    psi <- params[2]
+    ll <- 0;
+    for (t in 1:length(data$y))
+    {
+      sum_x = 0
+      lambda = 1000*exp(-mu*(t+1))*psi;
+      for (i in 1:y[t]){
+        sum_x <- sum_x + i
+      }
+      ll <- ll - lambda + y[t]*log(lambda) - sum_x
+    }
+    ll
+  }
+)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+dataMos <- read.csv("./RWM_mosquito.csv")
+data <-   list(
+  time = dataMos$time,
+  y = dataMos$recaptured
+)
+
+settings <-  list(
+  nrChains = 10,
+  M = 10,
+  iterations = 100000, 
+  burn = 1,
+  thin = 1,
+  consoleUpdates = 100,
+  P = 2,              
+  adap_Cov = TRUE,
+  adap_Cov_freq = 1,
+  adap_Cov_burn = 10000,
+  adap_Temp = TRUE,
+  adap_Temp_freq = 1,
+  Debug = FALSE
+)
+```
+
+
+```{r}
+model <- ptmc_func(model=model, data=data, settings=settings)
+```
