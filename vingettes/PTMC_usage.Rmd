@@ -15,20 +15,62 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r setup}
 library(tidyverse)
 library(ptmc)
+library(coda)
 ```
 
-## R Markdown
+# Parallel Tempering Monte Carlo
+
+## Model 
+
+The example model is taken from Ben Lambert's fantastic book, "A Student's Guide to Bayesian Statistics," [Questions 13.3](https://benlambertdotcom.files.wordpress.com/2018/08/bayesianbook_problemsanswers_final.pdf#page=124). Breifly, I assume the random count variable $X_t$, the number of mosquitos caught during day $t$, is Poission, such that
+
+\begin{equation}
+\begin{split}
+X_t &\sim \textit{Poisson}(\lambda)\\ 
+\lambda &= 1000 \times \exp(-\mu t)\psi
+\end{split}
+\end{equation}
+
+where $\mu$ is a constant mortality hazard rate and $\psi$ is the daily recapture probability with priors distributions of $\mu \sim \Gamma(2,20)$ and $\psi \sim \textit{Beta}(2, 40)$. The data $x_t$, the number of mosquitos caught on day $t$ is given in the RWM_mosquito.csv file but can be obtained [here](https://benlambertdotcom.files.wordpress.com/2018/08/all_data.zip). 
 
 
-```{r}
+## Implementation  
+
+### Create the model
+The `model` variable should be a list with three functions, `gen_init`, `eval_lpr`, and `eval_ll` and a vector string with the parameter names used in the calibration, `par_names`.
+
+#### `gen_init` 
+A function which generates the original samples (usually the prior distributions)
+
+* (no arguments)
+* @return vector of values 
+
+#### `eval_ll` 
+A function which generates the log likelihood for a set of parameter values
+
+* @param data, data needed to calcualte the log likelihood
+* @param params, parameter values
+* @return log likelihood 
+
+#### `eval_lpr`
+A fucntion which calcualte the log prior for a set of parameter values
+
+* @param params, parameter values
+* @return log prior 
+
+
+```{r model definition}
+# model is a list of three functions
 model <- list(
 
-  # Initial state of the model (at t0)
+  par_names = c("mu","psi"),
+
+  # Generate the initial step of Markov chain
   gen_init = function() {
     c(rgamma(1, 2, 20), rbeta(1, 2, 40))
   },
 
-  # Evaluate the
+  # Evaluate the log prior
   eval_lpr = function(params) {
     if (params[1] < 0 || params[2] < 0 || params[1] > 1 || params[2] > 1)
       return(-Inf)
@@ -36,11 +78,10 @@ model <- list(
     lpr <- 0
     lpr <- lpr + log(pgamma( params[1], 2,20))
     lpr <- lpr + log(pbeta( params[2], 2,40))
-    #cat("lpr: " , lpr, "\n")
     lpr
   },
 
-  # Required to calculate the logposterior
+  # Evaluate the log likelihood
   eval_ll = function(data, params) {
     y <- data$y
     mu <- params[1]
@@ -60,35 +101,86 @@ model <- list(
 )
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+### Obtain the data
+Data used to calcualte the likelhood can be in any format. 
 
-```{r pressure, echo=FALSE}
+```{r data import}
+
 dataMos <- read.csv("./RWM_mosquito.csv")
+# restructure the data for the log likelihood function
 data <-   list(
   time = dataMos$time,
   y = dataMos$recaptured
 )
+```
 
+### Settings
+The settings for the parallel tempering calibrations are summarised here
+
+#### Settings Options
+
+* nrChains, number of independent chains to run
+* M, number of dependent chains per chain run (i.e. the number of rungs in the temperature ladder)
+* iterations, the number of steps to take in the Markov chain, (including the burn in)
+* burn, the number of steps int he burn in (these are discarded)
+* thin, thinning of the chain (i.e. =10 means only everything 10th sample is saved)
+* consoleUpdates, frequency in which the console updates (i. =100 means every 100th step)
+* P, number of parameters
+* adap_Cov, whether to include adaptive covariance
+* adap_Cov_freq, frquency the adaptive covariance matrix os updated
+* adap_Cov_burn, number of steps to take before using the adaptive covariance matrix 
+* adap_Temp, wheter to include adaptive temperature ladder
+* adap_Temp_freq, frequency the adaptive temperature ladder is updated
+* Debug, run with debug output 
+
+```{r settings}
+
+# settings used for the ptmc model (See README)
 settings <-  list(
-  nrChains = 10,
+  nrChains = 3,
   M = 10,
-  iterations = 100000, 
+  iterations = 10000, 
   burn = 1,
   thin = 1,
   consoleUpdates = 100,
-  P = 2,              
+  P = 2,        
   adap_Cov = TRUE,
   adap_Cov_freq = 1,
-  adap_Cov_burn = 10000,
+  adap_Cov_burn = 1000,
   adap_Temp = TRUE,
   adap_Temp_freq = 1,
   Debug = FALSE
 )
 ```
 
+### Run the model (see documentation).
 
+```{r run model, echo=FALSE, message=FALSE}
+post <- ptmc_func(model=model, data=data, settings=settings)
+```
+
+### Plot the data 
+`ptmc_func` returns a list of length two. The first element is `post$mcmc` and is a mcmc or mcmc.list object (from the code package). I can plot these and calcualte convergence diagnostics using coda functions:
+
+```{r plot outcomes}
+# Plot trace plots and posterior distributions for $mcmcriors for a chain i
+par(mar = rep(2, 4)) # just for plotting purposes
+summary(post$mcmc)
+plot(post$mcmc)
+
+# Plot the Gelman-Rubin diagnostic for the parameters
+gelman.plot(post$mcmc)
+gelman.diag(post$mcmc)
+
+```
+
+The second element is `post$lpost` and is long table dataframe of the log posterior values. These values can be easily plotted using ggplot2:
 ```{r}
-model <- ptmc_func(model=model, data=data, settings=settings)
+# Plot of the logposterior for the three chains
+lpost_conv <- post$lpost %>% filter(sample_no>5000)
+logpostplot <- ggplot(lpost_conv, aes(x = sample_no, y = lpost)) + 
+  geom_line(aes(color = chain_no), size = 0.2, alpha=0.8) +
+  theme_minimal()
+logpostplot
 ```

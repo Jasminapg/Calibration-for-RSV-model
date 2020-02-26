@@ -1,7 +1,7 @@
 #include <Rcpp.h>
 #include <RcppEigen.h>
 
-#include "ptmc.hpp"
+#include "./headers/ptmc.hpp"
 // [[Rcpp::depends(RcppEigen)]]
 
 using RPTMC = ptmc::PTMC<Rcpp::RObject>;
@@ -42,9 +42,9 @@ Eigen::MatrixXd run_ptmc(Rcpp::List model, Rcpp::RObject data, Rcpp::List settin
   {
 
   RPTMC PTMC;
-  init_gen_init(&PTMC, model[0]);
-  init_eval_lpr(&PTMC, model[1]);
-  init_eval_ll(&PTMC, model[2]);
+  init_gen_init(&PTMC, model["gen_init"]);
+  init_eval_lpr(&PTMC, model["eval_lpr"]);
+  init_eval_ll(&PTMC, model["eval_ll"]);
 
   MatrixXd output;
   output = PTMC.run_ptmc_C(PTMC, data, settings);
