@@ -39,20 +39,23 @@ where $\mu$ is a constant mortality hazard rate and $\psi$ is the daily recaptur
 ### Create the model
 The `model` variable should be a list with three functions, `gen_init`, `eval_lpr`, and `eval_ll` and a vector string with the parameter names used in the calibration, `par_names`.
 
-#### `gen_init` 
+#### vector string `parnames` 
+A vector string of the parameter names 
+
+#### func `gen_init` 
 A function which generates the original samples (usually the prior distributions)
 
 * (no arguments)
 * @return vector of values 
 
-#### `eval_ll` 
+#### func `eval_ll` 
 A function which generates the log likelihood for a set of parameter values
 
 * @param data, data needed to calcualte the log likelihood
 * @param params, parameter values
 * @return log likelihood 
 
-#### `eval_lpr`
+#### func `eval_lpr`
 A fucntion which calcualte the log prior for a set of parameter values
 
 * @param params, parameter values
@@ -103,7 +106,7 @@ model <- list(
 
 
 ### Obtain the data
-Data used to calcualte the likelhood can be in any format. 
+Data used in the likelhood function can be in any format. 
 
 ```{r data import}
 
@@ -154,13 +157,13 @@ settings <-  list(
 )
 ```
 
-### Run the model (see documentation).
+### Run the model.
 
-```{r run model, echo=FALSE, message=FALSE}
+```{r run model,  message=FALSE, results = 'hide'}
 post <- ptmc_func(model=model, data=data, settings=settings)
 ```
 
-### Plot the data 
+## Plot the data 
 `ptmc_func` returns a list of length two. The first element is `post$mcmc` and is a mcmc or mcmc.list object (from the code package). I can plot these and calcualte convergence diagnostics using coda functions:
 
 ```{r plot outcomes}
