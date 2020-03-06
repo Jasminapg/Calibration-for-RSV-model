@@ -29,9 +29,16 @@ Parallel Tempering Monte Carlo
 Model
 -----
 
-The example model is taken from Ben Lambert's fantastic book, "A Student's Guide to Bayesian Statistics," [Questions 13.3](https://benlambertdotcom.files.wordpress.com/2018/08/bayesianbook_problemsanswers_final.pdf#page=124). Breifly, I assume the random count variable *X*<sub>*t*</sub>, the number of mosquitos caught during day *t*, is Poission, such that
+The example model is taken from Ben Lambert's fantastic book, "A Student's Guide to Bayesian Statistics," [Questions 13.3](https://benlambertdotcom.files.wordpress.com/2018/08/bayesianbook_problemsanswers_final.pdf#page=124). Briefly, I assume the random count variable *X*<sub>*t*</sub>, the number of mosquitos caught during day *t*, is Poisson, such that
 
-where *μ* is a constant mortality hazard rate and *ψ* is the daily recapture probability with priors distributions of *μ* ∼ *Γ*(2, 20) and *ψ* ∼ *Beta*(2, 40). The data *x*<sub>*t*</sub>, the number of mosquitos caught on day *t* is given in the RWM\_mosquito.csv file but can be obtained [here](https://benlambertdotcom.files.wordpress.com/2018/08/all_data.zip).
+$$
+\\begin{split}
+X\_t &\\sim \\textit{Poisson}(\\lambda)\\\\ 
+\\lambda &= 1000 \\times \\exp(-\\mu t)\\psi
+\\end{split}
+$$
+
+where *μ* is a constant mortality hazard rate and *ψ* is the daily recapture probability with prior distributions of *μ* ∼ *Γ*(2, 20) and *ψ* ∼ *Beta*(2, 40). The data *x*<sub>*t*</sub>, the number of mosquitos caught on day *t*, are given in the RWM\_mosquito.csv file but can also be found [here](https://benlambertdotcom.files.wordpress.com/2018/08/all_data.zip).
 
 Implementation
 --------------
@@ -42,32 +49,32 @@ The `model` variable should be a list with three functions, `gen_init`, `eval_lp
 
 #### vector string `parnames`
 
-A vector string of the parameter names
+A vector string of the parameter names.
 
 #### func `gen_init`
 
-A function which generates the original samples (usually the prior distributions)
+A function which generates the initial values (usually by sampling the prior distributions)
 
 -   (no arguments)
 -   @return vector of values
 
 #### func `eval_ll`
 
-A function which generates the log likelihood for a set of parameter values
+A function which generates the log-likelihood for a set of parameter values
 
--   @param data, data needed to calcualte the log likelihood
+-   @param data, data needed to calculate the log-likelihood
 -   @param params, parameter values
--   @return log likelihood
+-   @return log-likelihood
 
 #### func `eval_lpr`
 
-A fucntion which calcualte the log prior for a set of parameter values
+A function which calculates the log-prior for a set of parameter values
 
 -   @param params, parameter values
--   @return log prior
+-   @return log-prior
 
 ``` r
-# model is a list of three functions
+# model is a list of three functions and a vector string
 model <- list(
 
   par_names = c("mu","psi"),
@@ -77,7 +84,7 @@ model <- list(
     c(rgamma(1, 2, 20), rbeta(1, 2, 40))
   },
 
-  # Evaluate the log prior
+  # Evaluate the log-prior
   eval_lpr = function(params) {
     if (params[1] < 0 || params[2] < 0 || params[1] > 1 || params[2] > 1)
       return(-Inf)
@@ -88,7 +95,7 @@ model <- list(
     lpr
   },
 
-  # Evaluate the log likelihood
+  # Evaluate the log-likelihood
   eval_ll = function(data, params) {
     y <- data$y
     mu <- params[1]
@@ -110,11 +117,11 @@ model <- list(
 
 ### Obtain the data
 
-Data used in the likelhood function can be in any format.
+Data used in the log-likelihood function can be in any format.
 
 ``` r
 dataMos <- read.csv("./RWM_mosquito.csv")
-# restructure the data for the log likelihood function
+# restructure the data for the log-likelihood function
 data <-   list(
   time = dataMos$time,
   y = dataMos$recaptured
@@ -123,26 +130,26 @@ data <-   list(
 
 ### Settings
 
-The settings for the parallel tempering calibrations are summarised here
+The settings for the parallel tempering algorithm are summarised here.
 
 #### Settings Options
 
 -   nrChains, number of independent chains to run
 -   M, number of dependent chains per chain run (i.e. the number of rungs in the temperature ladder)
--   iterations, the number of steps to take in the Markov chain, (including the burn in)
--   burn, the number of steps int he burn in (these are discarded)
--   thin, thinning of the chain (i.e. =10 means only everything 10th sample is saved)
--   consoleUpdates, frequency in which the console updates (i. =100 means every 100th step)
+-   iterations, the number of steps to take in the Markov chain, (including the burn-in)
+-   burn, the number of steps in the burn-in (these are discarded)
+-   thin, thinning of the chain (i.e. =10 means only every 10th sample is saved)
+-   consoleUpdates, frequency at which the console updates (i. =100 means every 100th step)
 -   P, number of parameters
 -   adap\_Cov, whether to include adaptive covariance
--   adap\_Cov\_freq, frquency the adaptive covariance matrix os updated
+-   adap\_Cov\_freq, frequency at which the adaptive covariance matrix is updated
 -   adap\_Cov\_burn, number of steps to take before using the adaptive covariance matrix
--   adap\_Temp, wheter to include adaptive temperature ladder
--   adap\_Temp\_freq, frequency the adaptive temperature ladder is updated
+-   adap\_Temp, whether to include adaptive temperature ladder
+-   adap\_Temp\_freq, frequency at which the adaptive temperature ladder is updated
 -   Debug, run with debug output
 
 ``` r
-# settings used for the ptmc model (See README)
+# settings used for the ptmc model 
 settings <-  list(
   nrChains = 3,
   M = 10,
@@ -169,10 +176,9 @@ post <- ptmc_func(model=model, data=data, settings=settings)
 Plot the data
 -------------
 
-`ptmc_func` returns a list of length two. The first element is `post$mcmc` and is a mcmc or mcmc.list object (from the code package). I can plot these and calcualte convergence diagnostics using coda functions:
+`ptmc_func` returns a list of length two. The first entry is `post$mcmc` a mcmc or mcmc.list object (from the coda package). I can plot these and calculate convergence diagnostics using coda functions:
 
 ``` r
-# Plot trace plots and posterior distributions for $mcmcriors for a chain i
 par(mar = rep(2, 4)) # just for plotting purposes
 summary(post$mcmc)
 ```
@@ -187,14 +193,14 @@ summary(post$mcmc)
     ##    plus standard error of the mean:
     ## 
     ##        Mean       SD  Naive SE Time-series SE
-    ## mu  0.10047 0.008647 4.993e-05      9.532e-05
-    ## psi 0.04661 0.003369 1.945e-05      3.569e-05
+    ## mu  0.10043 0.008738 5.045e-05      9.521e-05
+    ## psi 0.04661 0.003440 1.986e-05      3.773e-05
     ## 
     ## 2. Quantiles for each variable:
     ## 
     ##        2.5%     25%     50%     75%   97.5%
-    ## mu  0.08366 0.09481 0.10041 0.10591 0.11762
-    ## psi 0.04027 0.04436 0.04651 0.04873 0.05346
+    ## mu  0.08328 0.09472 0.10045 0.10606 0.11779
+    ## psi 0.04007 0.04437 0.04653 0.04876 0.05346
 
 ``` r
 plot(post$mcmc)
@@ -216,14 +222,14 @@ gelman.diag(post$mcmc)
     ## Potential scale reduction factors:
     ## 
     ##     Point est. Upper C.I.
-    ## mu           1       1.00
-    ## psi          1       1.01
+    ## mu           1          1
+    ## psi          1          1
     ## 
     ## Multivariate psrf
     ## 
     ## 1
 
-The second element is `post$lpost` and is long table dataframe of the log posterior values. These values can be easily plotted using ggplot2:
+The second entry is `post$lpost` and is long table dataframe of the log-posterior values. These values can be easily plotted using ggplot2:
 
 ``` r
 # Plot of the logposterior for the three chains
