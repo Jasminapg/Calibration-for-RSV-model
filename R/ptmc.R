@@ -1,9 +1,9 @@
 #' Create a model
 #'
-#' @param model The model to run ptmc for (build using \code{\link{build_model}}).
+#' @param model The model to run ptmc.
 #' @param data Data used in the calibration process
 #' @param settings settings
-#' @return Returns a model with the approximate log likelihood value calculated using SMC (`model$logLikelihood`). If `history` is set to `True` then the history is stored in `model$particle`s.
+#' @return Returns a list with the fist element being the mcmc samples formatting for analysis and plottig with the CODA package. The second is the log posterior value at each time step.
 #'
 #' @export
 ptmc_func <- function(model, data, settings) {
