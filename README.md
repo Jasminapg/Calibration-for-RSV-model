@@ -19,5 +19,5 @@ See ptmc_performance repository.
 
 ## License
 
-See LICENCE file.
+See LICENSE file.
 
