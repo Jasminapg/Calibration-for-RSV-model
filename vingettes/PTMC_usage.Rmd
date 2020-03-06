@@ -1,7 +1,7 @@
 ---
 title: "PTMC_usage"
 author: "David Hodgson"
-output: rmarkdown::html_vignette
+output: rmarkdown::github_document
 vignette: >
   %\VignetteIndexEntry{PTMC_usage}
   %\VignetteEngine{knitr::rmarkdown}
