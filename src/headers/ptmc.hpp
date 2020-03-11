@@ -153,8 +153,8 @@ namespace ptmc {
     // Randomly sample a proposal given the current (mu) a covariagne matrix, scale and the number of parameters P. s
     VectorXd proposal_sample(VectorXd curr, MatrixXd covar, double scale, int P)
     {
-      if (scale > 1)
-        scale = 1;
+// if (scale > 1)
+//       scale = 1;
       VectorXd trans_temp(P);
 
       EigenMultivariateNormal normX_solver(curr, scale*covar, true, engine());
@@ -246,20 +246,20 @@ struct PTMC
     PTMC_t.covar_A = MatrixXd::Zero(PTMC_t.M*PTMC_t.P ,PTMC_t.P );
     for(int i = 0; i < PTMC_t.P ; i++)
     {
-      PTMC_t.covar_nA(i,i) = 1.0/10000.0;
+      PTMC_t.covar_nA(i,i) = 1.0;
     }
     for (int m = 0; m < PTMC_t.M; m++)
     {
       for(int i = 0; i < PTMC_t.P ; i++)
-        PTMC_t.covar_A(m*PTMC_t.P+i,i) = 1.0/10000.0;
+        PTMC_t.covar_A(m*PTMC_t.P+i,i) = 1.0;
     }
 
     PTMC_t.lambda = VectorXd::Zero(PTMC_t.M);
     PTMC_t.Ms = VectorXd::Zero(PTMC_t.M);
     for(int i = 0; i < PTMC_t.M; i++)
     {
-      PTMC_t.lambda(i) = 0;
-      PTMC_t.Ms(i) = -10;
+        PTMC_t.lambda(i) = log(0.1*0.1/(double)PTMC_t.P);
+        PTMC_t.Ms(i) = log(2.382*2.382/(double)PTMC_t.P);
     }
   }
 
@@ -272,7 +272,7 @@ struct PTMC
     int burn = PTMC_t.burn; // burn int
     int thin = PTMC_t.thin; // thining
     int M = PTMC_t.M;       // Number chains in temperature ladder
-    int m_step = M/2;
+    int m_step = M;
 
     int P = PTMC_t.P;       // Number of parameters
     int adap_Cov_burn = PTMC_t.adap_Cov_burn;// Number of steps to run before the adaptive covariance matrix starts
@@ -308,7 +308,7 @@ struct PTMC
       tempering.push_back(pow(10, 7.0*(i)/(M-1.0)));
 
     for (int i = 0; i < M-1; i++)
-      S.push_back(log(tempering[i+1]-tempering[i]));
+      S.push_back(log(log(tempering[i+1])-log(tempering[i])));
 
     for (int i = 0; i < iterations; i++){
       for (int m = 0; m < M; m++){
@@ -358,7 +358,7 @@ struct PTMC
             int iA = i-adap_Cov_burn;  gf = pow(1+iA,-0.5);
             if (iA == 1){
               PTMC_t.current_mu.row(m) = PTMC_t.current.row(m);
-              PTMC_t.Ms[m] = PTMC_t.lambda[m];
+              PTMC_t.Ms[m] = PTMC_t.Ms[m]*PTMC_t.lambda[m];
             }
             else
             {
@@ -384,6 +384,7 @@ struct PTMC
             swap1 = PTMC_t.current.row(p); swap2 = PTMC_t.current.row(p+1);
             PTMC_t.current.row(p) = swap2; PTMC_t.current.row(p+1) = swap1;
           }
+
             S[p] += pow((1+counterFunEvalTemp[p]),(-0.5))*(r - 0.234);
         }
 
@@ -392,8 +393,8 @@ struct PTMC
             if (exp(S[m]) < 0 || isinf(exp(S[m]))||isnan(exp(S[m])))
               stop("exp(S[m]) is either negative or infinite/nan. Value: ", exp(S[m]));
             double expS;
-            if (exp(S[m]) == 0){
-              expS = exp(-100);
+            if (S[m] < -1){
+              expS = exp(-1);
             }
             else{
               expS = exp(S[m]);
@@ -402,7 +403,7 @@ struct PTMC
             if (tempering[m] < 0 || isinf(tempering[m])||isnan(tempering[m]))
               stop("tempering[m] is either negative or infinite/nan. Value: ", tempering[m]);
               
-            tempering[m+1] = tempering[m] + expS;
+            tempering[m+1] = tempering[m]*exp(expS);
           }
         }
       }
