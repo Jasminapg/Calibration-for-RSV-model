@@ -187,3 +187,13 @@ logpostplot <- ggplot(lpost_conv, aes(x = sample_no, y = lpost)) +
   theme_minimal()
 logpostplot
 ```
+
+The third entry is `post$temp` and is long table dataframe of the adaptive temperature values. These values can be easily plotted using ggplot2:
+```{r}
+# Plot of the logposterior for the three chains
+#temp_conv <- post$temp %>% filter(sample_no>5000)
+tempplot <- ggplot(post$temp, aes(x = sample_no, y = temperature)) + 
+  geom_line(aes(color = chain_no), size = 0.2, alpha=0.8) +
+  theme_minimal()
+tempplot
+```

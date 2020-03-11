@@ -217,7 +217,7 @@ struct PTMC
     PTMC_t.debug = settings["Debug"];
 
     PTMC_t.run_s = (PTMC_t.iterations-PTMC_t.burn)/(PTMC_t.thin);
-    PTMC_t.chain = MatrixXd::Zero(PTMC_t.M*PTMC_t.run_s,PTMC_t.P+1);
+    PTMC_t.chain = MatrixXd::Zero(PTMC_t.M*PTMC_t.run_s,PTMC_t.P+2);
 
     VectorXd init;
     PTMC_t.currentLP = VectorXd::Zero(PTMC_t.M);
@@ -268,10 +268,12 @@ struct PTMC
   MatrixXd run_ptmc_C(PTMC<D>& PTMC_t, D data, List settings)
   {
     initialise(PTMC_t, data, settings);
-
+      
     int burn = PTMC_t.burn; // burn int
     int thin = PTMC_t.thin; // thining
     int M = PTMC_t.M;       // Number chains in temperature ladder
+    int m_step = M/2;
+
     int P = PTMC_t.P;       // Number of parameters
     int adap_Cov_burn = PTMC_t.adap_Cov_burn;// Number of steps to run before the adaptive covariance matrix starts
     int l = PTMC_t.run_s;       // Number of samples in the posterior
@@ -303,7 +305,7 @@ struct PTMC
     double gf;
 
     for (int i = 0; i < M; i++)
-      tempering.push_back(pow(10, 7.0*(i+1-1.0)/(M-1.0)));
+      tempering.push_back(pow(10, 7.0*(i)/(M-1.0)));
 
     for (int i = 0; i < M-1; i++)
       S.push_back(log(tempering[i+1]-tempering[i]));
@@ -312,45 +314,47 @@ struct PTMC
       for (int m = 0; m < M; m++){
         if (debug) Rcout << "METROPOLIS SECTION. Iteration number: " << i << ". Temperature ladder number: " << m << ". ";
           accepted = false;
-          if (i < adap_Cov_burn || uniform_dist(0, 1,'r') < 0.05 || !adap_Cov || m > 4){
-            counter_nonadapt[m]++;adaptive = false;
+          if (i < adap_Cov_burn || uniform_dist(0, 1,'r') < 0.05 || !adap_Cov || m > m_step){
+            counter_nonadapt[m]++; adaptive = false;
             cov = PTMC_t.covar_nA;
             proposal = proposal_sample(PTMC_t.current.row(m), cov, exp(PTMC_t.lambda[m]), P);
-            proposalLP = PTMC_t.get_lp(data,proposal);
+            proposalLP = PTMC_t.get_lp(data, proposal);
             alpha = metropolisRatio(proposalLP, PTMC_t.currentLP(m), tempering[m]);
           }
           else{
             counter_adapt[m]++; adaptive = true;
             cov = PTMC_t.covar_A.block(m*P,0,P,P);
             proposal = proposal_sample(PTMC_t.current.row(m), cov, exp(PTMC_t.Ms[m]), P);
-            proposalLP = PTMC_t.get_lp(data,proposal);
+            proposalLP = PTMC_t.get_lp(data, proposal);
             alpha = metropolisRatio(proposalLP, PTMC_t.currentLP(m), tempering[m]);
           }
           counterFunEval[m]++;
-
+          
+          // Update the parameters
+          if (adaptive)
+            PTMC_t.Ms[m] += pow(1+counter_adapt[m],-0.5)*(alpha - 0.234);
+          else
+            PTMC_t.lambda[m] += pow(1+counter_nonadapt[m],-0.5)*(alpha - 0.234);
+          
           // If accepted
           if (uniform_dist(0,1,'r') < alpha ){
             accepted = true; counterAccept[m]++;
             PTMC_t.current.row(m) = proposal;
             PTMC_t.currentLP(m) = proposalLP;
-            acceptanceRate[m] = (double)counterAccept[m]/(double)counterFunEval[m];
-            if (adaptive)
-              PTMC_t.Ms[m] += pow(1+counter_adapt[m],-0.5)*(acceptanceRate[m] - 0.234);
-            else
-              PTMC_t.lambda[m] += pow(1+counter_nonadapt[m],-0.5)*(acceptanceRate[m] - 0.234);
           }
 
           if((i > (burn-1)) && (i%thin == 0) ){
 
-            for (int p = 0; p<P; p++){
+            for (int p = 0; p < P; p++){
               PTMC_t.chain(m*l+counter[m], p) = PTMC_t.current(m,p);
             }
             PTMC_t.chain(m*l+counter[m], P) = PTMC_t.currentLP(m);
+            PTMC_t.chain(m*l+counter[m], P+1) = tempering[m];
 
             counter[m]++;
           }
 
-          if(i%adap_Cov_freq == 0 && i> adap_Cov_burn){
+          if(i%adap_Cov_freq == 0 && i > adap_Cov_burn){
             int iA = i-adap_Cov_burn;  gf = pow(1+iA,-0.5);
             if (iA == 1){
               PTMC_t.current_mu.row(m) = PTMC_t.current.row(m);
@@ -380,7 +384,7 @@ struct PTMC
             swap1 = PTMC_t.current.row(p); swap2 = PTMC_t.current.row(p+1);
             PTMC_t.current.row(p) = swap2; PTMC_t.current.row(p+1) = swap1;
           }
-          S[p] += pow((1+counterFunEvalTemp[p]),(-0.5))*((double)counterAcceptTemp[p]/(double)counterFunEvalTemp[p] - 0.234);
+            S[p] += pow((1+counterFunEvalTemp[p]),(-0.5))*(r - 0.234);
         }
 
         if (adap_Temp){
@@ -397,6 +401,7 @@ struct PTMC
 
             if (tempering[m] < 0 || isinf(tempering[m])||isnan(tempering[m]))
               stop("tempering[m] is either negative or infinite/nan. Value: ", tempering[m]);
+              
             tempering[m+1] = tempering[m] + expS;
           }
         }
@@ -405,7 +410,7 @@ struct PTMC
         Rcout << "Running MCMC-PT iteration number: " << i << " of " << iterations << ". Current logpost: " << PTMC_t.currentLP(0) << ". " << PTMC_t.currentLP(1) << "           " << "\r";
     }
 
-    return PTMC_t.chain.block(0, 0, PTMC_t.run_s, PTMC_t.P+1);
+    return PTMC_t.chain.block(0, 0, PTMC_t.run_s, PTMC_t.P+2);
   }
 
 };
