@@ -143,7 +143,7 @@ namespace ptmc {
     {
       double ratio;
       if(std::isnan(LPN - LPO))
-        ratio = log(0);
+        ratio = 0;
       else
         ratio = min(1.0, exp((LPN - LPO)/temp));
 
@@ -272,7 +272,7 @@ struct PTMC
     int burn = PTMC_t.burn; // burn int
     int thin = PTMC_t.thin; // thining
     int M = PTMC_t.M;       // Number chains in temperature ladder
-    int m_step = M;
+    int m_step = M/2;
 
     int P = PTMC_t.P;       // Number of parameters
     int adap_Cov_burn = PTMC_t.adap_Cov_burn;// Number of steps to run before the adaptive covariance matrix starts
@@ -331,13 +331,20 @@ struct PTMC
           counterFunEval[m]++;
           
           // Update the parameters
-          if (adaptive)
+          if (adaptive){
             PTMC_t.Ms[m] += pow(1+counter_adapt[m],-0.5)*(alpha - 0.234);
-          else
+              if (isinf(PTMC_t.Ms[m]) || isnan(PTMC_t.Ms[m])){
+                  stop("Ms is infinite or not a number.");
+              }
+          }
+          else{
             PTMC_t.lambda[m] += pow(1+counter_nonadapt[m],-0.5)*(alpha - 0.234);
-          
+              if (isinf(PTMC_t.lambda[m]) || isnan(PTMC_t.lambda[m])){
+                  stop("lambda is infinite or not a number.");
+              }
+          }
           // If accepted
-          if (uniform_dist(0,1,'r') < alpha ){
+          if (uniform_dist(0, 1,'r') < alpha ){
             accepted = true; counterAccept[m]++;
             PTMC_t.current.row(m) = proposal;
             PTMC_t.currentLP(m) = proposalLP;
@@ -399,11 +406,11 @@ struct PTMC
             else{
               expS = exp(S[m]);
             }
-
-            if (tempering[m] < 0 || isinf(tempering[m])||isnan(tempering[m]))
-              stop("tempering[m] is either negative or infinite/nan. Value: ", tempering[m]);
               
             tempering[m+1] = tempering[m]*exp(expS);
+
+              if (tempering[m] < 0 || isinf(tempering[m])||isnan(tempering[m]))
+                stop("tempering[m] is either negative or infinite/nan. Value: ", tempering[m]);
           }
         }
       }
