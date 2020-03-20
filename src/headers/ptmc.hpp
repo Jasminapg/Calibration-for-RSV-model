@@ -15,6 +15,7 @@
 using namespace Rcpp;
 using namespace std;
 using namespace Eigen;
+
 using namespace boost::math;
 
 std::random_device dev;
@@ -217,7 +218,7 @@ struct PTMC
     PTMC_t.debug = settings["Debug"];
 
     PTMC_t.run_s = (PTMC_t.iterations-PTMC_t.burn)/(PTMC_t.thin);
-    PTMC_t.chain = MatrixXd::Zero(PTMC_t.M*PTMC_t.run_s,PTMC_t.P+2);
+    PTMC_t.chain = MatrixXd::Zero(PTMC_t.M*PTMC_t.run_s,PTMC_t.P+3);
 
     VectorXd init;
     PTMC_t.currentLP = VectorXd::Zero(PTMC_t.M);
@@ -357,7 +358,8 @@ struct PTMC
             }
             PTMC_t.chain(m*l+counter[m], P) = PTMC_t.currentLP(m);
             PTMC_t.chain(m*l+counter[m], P+1) = tempering[m];
-
+            PTMC_t.chain(m*l+counter[m], P+2) = (double)counterAccept[m]/(double)counterFunEval[m];
+            
             counter[m]++;
           }
 
@@ -418,7 +420,7 @@ struct PTMC
         Rcout << "Running MCMC-PT iteration number: " << i << " of " << iterations << ". Current logpost: " << PTMC_t.currentLP(0) << ". " << PTMC_t.currentLP(1) << "           " << "\r";
     }
 
-    return PTMC_t.chain.block(0, 0, PTMC_t.run_s, PTMC_t.P+2);
+    return PTMC_t.chain.block(0, 0, PTMC_t.run_s, PTMC_t.P+3);
   }
 
 };
@@ -426,4 +428,3 @@ struct PTMC
 };
 // namespace ptmc
 #endif
-
