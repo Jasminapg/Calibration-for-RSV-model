@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r setup}
-devtools::install("..") #install if needed
+#devtools::install("..") #install if needed
 library(ptmc)
 library(tidyverse) 
 library(coda)
