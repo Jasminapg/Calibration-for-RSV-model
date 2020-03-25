@@ -1,53 +1,54 @@
 #include <Rcpp.h>
 #include <RcppEigen.h>
 
+#include "./headers/mvn.hpp"
 #include "./headers/ptmc.hpp"
-// [[Rcpp::depends(RcppEigen)]]
 
+// [[Rcpp::depends(RcppEigen)]]
 using RPTMC = ptmc::PTMC<Rcpp::RObject>;
 
-void init_gen_init(RPTMC* model, Rcpp::Function gen_init) {
-  auto func = [gen_init]() {
+void init_samplePriorDistributions(RPTMC* model, Rcpp::Function samplePriorDistributions) {
+  auto func = [samplePriorDistributions]() {
     PutRNGstate();
-    auto rData = gen_init();
+    auto rData = samplePriorDistributions();
     GetRNGstate();
     return Rcpp::as<VectorXd>(rData);
   };
-  model->gen_init = func;
+  model->samplePriorDistributions = func;
 }
 
-void init_eval_lpr(RPTMC* model, Rcpp::Function eval_lpr) {
-  auto func = [eval_lpr](VectorXd params) {
+void init_evaluateLogPrior(RPTMC* model, Rcpp::Function evaluateLogPrior) {
+  auto func = [evaluateLogPrior](VectorXd params) {
     PutRNGstate();
-    auto rData = eval_lpr(params);
+    auto rData = evaluateLogPrior(params);
     GetRNGstate();
     return Rcpp::as<double>(rData);
   };
-  model->eval_lpr = func;
+  model->evaluateLogPrior = func;
 }
 
-void init_eval_ll(RPTMC* model, Rcpp::Function eval_ll) {
-  auto func = [eval_ll](Rcpp::RObject data, VectorXd params) {
+void init_evaluateLogLikelihood(RPTMC* model, Rcpp::Function evaluateLogLikelihood) {
+  auto func = [evaluateLogLikelihood](Rcpp::RObject data, VectorXd params) {
     PutRNGstate();
-    auto rData = eval_ll(data, params);
+    auto rData = evaluateLogLikelihood(data, params);
     GetRNGstate();
     return Rcpp::as<double>(rData);
   };
-  model->eval_ll = func;
+  model->evaluateLogLikelihood = func;
 }
 
 
 // [[Rcpp::export]]
 Eigen::MatrixXd run_ptmc(Rcpp::List model, Rcpp::RObject data, Rcpp::List settings)
-  {
+{
 
-  RPTMC PTMC;
-  init_gen_init(&PTMC, model["gen_init"]);
-  init_eval_lpr(&PTMC, model["eval_lpr"]);
-  init_eval_ll(&PTMC, model["eval_ll"]);
+  RPTMC PTMC;   MatrixXd output;
+  init_samplePriorDistributions(&PTMC, model["samplePriorDistributions"]);
+  init_evaluateLogPrior(&PTMC, model["evaluateLogPrior"]);
+  init_evaluateLogLikelihood(&PTMC, model["evaluateLogLikelihood"]);
 
-  MatrixXd output;
-  output = PTMC.run_ptmc_C(PTMC, data, settings);
+  PTMC.initialiseClass(data, settings);
+  output = PTMC.runPTMCC();
 
   return output;
 }

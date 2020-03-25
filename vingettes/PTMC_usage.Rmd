@@ -13,9 +13,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r setup}
-#devtools::install(ptmc) install if needed
+devtools::install("..") #install if needed
 library(ptmc)
-library(tidyverse)
+library(tidyverse) 
 library(coda)
 ```
 
@@ -38,25 +38,25 @@ where $\mu$ is a constant mortality hazard rate and $\psi$ is the daily recaptur
 ## Implementation  
 
 ### Create the model
-The `model` variable should be a list with three functions, `gen_init`, `eval_lpr`, and `eval_ll` and a vector string with the parameter names used in the calibration, `par_names`.
+The `model` list should be a list with three functions, `samplePriorDistributions`, `evaluateLogLikelihood`, and `evaluateLogPrior` and a vector string with the parameter names used in the calibration, `namesOfParameters`.
 
-#### vector string `parnames` 
+#### vector string `par_names` 
 A vector string of the parameter names.
 
-#### func `gen_init` 
+#### func `samplePriorDistributions` 
 A function which generates the initial values (usually by sampling the prior distributions)
 
 * (no arguments)
 * @return vector of values 
 
-#### func `eval_ll` 
+#### func `evaluateLogLikelihood` 
 A function which generates the log-likelihood for a set of parameter values
 
 * @param data, data needed to calculate the log-likelihood
 * @param params, parameter values
 * @return log-likelihood 
 
-#### func `eval_lpr`
+#### func `evaluateLogPrior`
 A function which calculates the log-prior for a set of parameter values
 
 * @param params, parameter values
@@ -67,15 +67,13 @@ A function which calculates the log-prior for a set of parameter values
 # model is a list of three functions and a vector string
 model <- list(
 
-  par_names = c("mu","psi"),
+  namesOfParameters = c("mu","psi"),
 
-  # Generate the initial step of Markov chain
-  gen_init = function() {
+  samplePriorDistributions = function() {
     c(rgamma(1, 2, 20), rbeta(1, 2, 40))
   },
 
-  # Evaluate the log-prior
-  eval_lpr = function(params) {
+  evaluateLogPrior = function(params) {
     if (params[1] < 0 || params[2] < 0 || params[1] > 1 || params[2] > 1)
       return(-Inf)
 
@@ -85,8 +83,7 @@ model <- list(
     lpr
   },
 
-  # Evaluate the log-likelihood
-  eval_ll = function(data, params) {
+  evaluateLogLikelihood = function(data, params) {
     y <- data$y
     mu <- params[1]
     psi <- params[2]
@@ -124,44 +121,46 @@ The settings for the parallel tempering algorithm are summarised here.
 
 #### Settings Options
 
-* nrChains, number of independent chains to run
-* M, number of dependent chains per chain run (i.e. the number of rungs in the temperature ladder)
+* numberChainRuns, number of independent chains to run
+* numberTempChains, number of dependent chains per chain run (i.e. the number of rungs in the temperature ladder)
 * iterations, the number of steps to take in the Markov chain, (including the burn-in)
-* burn, the number of steps in the burn-in (these are discarded)
+* burninPosterior, the number of steps in the burn-in (these are discarded)
 * thin, thinning of the chain (i.e. =10 means only every 10th sample is saved)
 * consoleUpdates, frequency at which the console updates (i. =100 means every 100th step)
-* P, number of parameters
-* adap_Cov, whether to include adaptive covariance
-* adap_Cov_freq, frequency at which the adaptive covariance matrix is updated
-* adap_Cov_burn, number of steps to take before using the adaptive covariance matrix 
-* adap_Temp, whether to include adaptive temperature ladder
-* adap_Temp_freq, frequency at which the adaptive temperature ladder is updated
+* numberFittedPar, number of parameters
+* onAdaptiveCov, whether to include adaptive covariance
+* updatesAdaptiveCov, frequency at which the adaptive covariance matrix is updated
+* burninAdaptiveCov, number of steps to take before using the adaptive covariance matrix 
+* onAdaptiveTemp, whether to include adaptive temperature ladder
+* updatesAdaptiveTemp, frequency at which the adaptive temperature ladder is updated
 * Debug, run with debug output 
 
 ```{r settings}
 
 # settings used for the ptmc model 
 settings <-  list(
-  nrChains = 3,
-  M = 10,
+  numberChainRuns = 3,
+  numberTempChains = 10,
   iterations = 10000, 
-  burn = 1,
+  burninPosterior = 1,
   thin = 1,
-  consoleUpdates = 100,
-  P = 2,        
-  adap_Cov = TRUE,
-  adap_Cov_freq = 1,
-  adap_Cov_burn = 1000,
-  adap_Temp = TRUE,
-  adap_Temp_freq = 1,
-  Debug = FALSE
+  consoleUpdates = 1,
+  numberFittedPar = 2,        
+  onAdaptiveCov = TRUE,
+  updatesAdaptiveCov = 1,
+  burninAdaptiveCov = 1000,
+  onAdaptiveTemp = TRUE,
+  updatesAdaptiveTemp = 1,
+  onDebug = FALSE
 )
 ```
 
 ### Run the model.
 
 ```{r run model,  message=FALSE, results = 'hide'}
+
 post <- ptmc_func(model=model, data=data, settings=settings)
+
 ```
 
 ## Plot the data 

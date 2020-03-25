@@ -14,7 +14,7 @@ ptmc_func(model, data, settings)
 \item{settings}{settings}
 }
 \value{
-Returns a model with the approximate log likelihood value calculated using SMC (`model$logLikelihood`). If `history` is set to `True` then the history is stored in `model$particle`s.
+
 }
 \description{
 Create a model
